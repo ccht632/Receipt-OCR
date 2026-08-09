@@ -1,0 +1,6 @@
+names:
+- text
+nc: 1
+path: C:\Users\Cht632\Asgmnt RSW\RSWY2S1\AI\ReceiptSplitter\data\SROIE2019
+train: train/images
+val: test/images
