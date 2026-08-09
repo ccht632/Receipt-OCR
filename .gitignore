@@ -4,8 +4,4 @@ __pycache__/
 .vscode/
 venv/
 .env
-runs/
-outputs/
-uploads/
 data/
-models/pretrained/
