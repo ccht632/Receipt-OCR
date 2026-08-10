@@ -1,7 +1,39 @@
+# ===== Python 缓存与包 =====
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-.vscode/
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ===== 虚拟环境（兼容你+队友写法）=====
 venv/
+.venv/
+env/
 .env
+
+# ===== 模型权重（绝对不上传）=====
+models/
+*.pth
+*.pt
+*.bin
+*.onnx
+*.pkl
+
+# ===== 数据集 =====
 data/
+
+# ===== 自动生成产物 =====
+outputs/
+runs/
+uploads/
+*.log
+
+# ===== IDE / 系统文件 =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== Jupyter 实验缓存 =====
+.ipynb_checkpoints/
