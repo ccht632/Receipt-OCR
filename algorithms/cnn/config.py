@@ -72,6 +72,7 @@ DBNET_BATCH_SIZE = 4
 DBNET_EPOCHS = 50
 DBNET_LR = 1e-4                 # fine-tune用小学习率
 DBNET_BACKBONE = "resnet18"     # 预训练权重对应的backbone
+DBNET_EARLY_STOP_PATIENCE = 10  # val_loss连续10轮不改善就提前停止
 
 # ============================================================
 # CRNN 超参数
@@ -82,6 +83,7 @@ CRNN_HIDDEN_SIZE = 256          # BiLSTM隐藏层大小
 CRNN_BATCH_SIZE = 32
 CRNN_EPOCHS = 100
 CRNN_LR = 1e-3
+CRNN_EARLY_STOP_PATIENCE = 10   # val_CER连续10轮不改善就提前停止
 
 # ============================================================
 # 推理相关
