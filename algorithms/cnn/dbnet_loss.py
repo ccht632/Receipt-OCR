@@ -1,8 +1,3 @@
-"""
-DBNet 损失函数，标准DB论文组合:
-  L = Lprob(OHEM二分类BCE) + alpha * Lbinary(Dice) + beta * Lthresh(MaskL1)
-OHEM: 正样本(文字)远少于负样本(背景)，只取loss最大的一部分负样本参与计算，避免负样本淹没梯度。
-"""
 import torch
 import torch.nn as nn
 
@@ -56,8 +51,8 @@ class DiceLoss(nn.Module):
 class DBLoss(nn.Module):
     def __init__(self, alpha=1.0, beta=10.0):
         super().__init__()
-        self.alpha = alpha  # binary_map(Dice) 权重
-        self.beta = beta    # thresh_map(L1) 权重
+        self.alpha = alpha
+        self.beta = beta
         self.prob_loss_fn = BalanceCrossEntropyLoss()
         self.thresh_loss_fn = MaskL1Loss()
         self.binary_loss_fn = DiceLoss()

@@ -1,14 +1,3 @@
-"""
-DBNet 训练用 Dataset。
-读取 prepare_dbnet_data.py 生成的 train_images/ + train_gts/，
-letterbox缩放到固定正方形(方便批量训练)，多边形坐标同步缩放，
-再调用 dbnet_gt.py 生成 prob_map / thresh_map 标签。
-
-注意：这里不调用 image_processing.py 的 auto_crop_receipt/deskew，
-因为box坐标是标在原始未处理图片上的，做几何变换会导致坐标和图片对不上。
-SROIE原图本身已经是较规整的收据照片，不做这些增强不影响训练效果；
-真实推理时 preprocess_for_dbnet 里的裁剪纠偏不影响这一点，因为推理不需要已知坐标。
-"""
 import os
 import cv2
 import numpy as np
@@ -19,14 +8,13 @@ from dbnet_gt import make_shrink_map, make_threshold_map
 
 
 def letterbox_with_polygons(image, polygons, target_size):
-    """等比例缩放+pad到 target_size x target_size 正方形，polygons同步缩放平移。"""
     h, w = image.shape[:2]
     scale = target_size / max(h, w)
     new_h, new_w = int(round(h * scale)), int(round(w * scale))
     resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
     canvas = np.zeros((target_size, target_size, 3), dtype=np.uint8)
-    canvas[:new_h, :new_w] = resized  # 左上对齐pad,不居中,简化坐标映射
+    canvas[:new_h, :new_w] = resized
 
     new_polygons = []
     for poly in polygons:

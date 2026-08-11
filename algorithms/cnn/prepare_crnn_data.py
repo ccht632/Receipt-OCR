@@ -1,12 +1,3 @@
-"""
-把 SROIE 的 box/ 标注 + 原图，裁剪成一张张文字行小图，
-生成 CRNN 训练需要的 (裁剪图, 文字标签) 数据对。
-
-输出：
-    data/SROIE_crnn/train_crops/xxx_0001.jpg, xxx_0002.jpg, ...
-    data/SROIE_crnn/train_labels.txt   每行: 相对路径\t文字内容
-    data/SROIE_crnn/alphabet.txt       训练集中出现过的所有字符(CTC解码用)
-"""
 import os
 import random
 import sys
@@ -19,7 +10,6 @@ from image_processing import load_image, crop_quad
 
 
 def parse_box_file(box_path):
-    """解析一个 box txt 文件，返回 [(四点坐标 np.array(4,2), transcript), ...]"""
     items = []
     with open(box_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -46,14 +36,12 @@ def convert_split(img_dir, box_dir, out_crops_dir, out_labels_file, charset: set
     os.makedirs(out_crops_dir, exist_ok=True)
 
     if not os.path.isdir(img_dir):
-        print(f"[跳过] 找不到目录: {img_dir}")
+        print(f"[Skip] Directory not found: {img_dir}")
         return 0
 
     img_files = sorted([f for f in os.listdir(img_dir)
                          if f.lower().endswith((".jpg", ".jpeg", ".png"))])
 
-    # 按收据(图片)先切train/val，保证同一张收据的所有文字行只出现在一边，
-    # 不会出现"同一张收据的两行,一行在train一行在val"这种数据泄漏
     val_stems = set()
     if val_ratio > 0 and val_labels_file:
         rng = random.Random(seed)
@@ -85,7 +73,6 @@ def convert_split(img_dir, box_dir, out_crops_dir, out_labels_file, charset: set
             continue
 
         for idx, (box, transcript) in enumerate(items):
-            # 过滤掉裁剪区域异常小的框(标注误差/噪声框)
             w = np.linalg.norm(box[0] - box[1])
             h = np.linalg.norm(box[0] - box[3])
             if w < 5 or h < 5:
@@ -115,17 +102,17 @@ def convert_split(img_dir, box_dir, out_crops_dir, out_labels_file, charset: set
         with open(val_labels_file, "w", encoding="utf-8") as f:
             f.write("\n".join(val_labels))
 
-    print(f"完成: {out_crops_dir}")
+    print(f"Complete: {out_crops_dir}")
     if val_labels_file:
-        print(f"  train: {len(train_labels)}条  val: {len(val_labels)}条  跳过的图: {n_skipped_img}")
+        print(f"  train: {len(train_labels)}records  val: {len(val_labels)}records  Skipped images: {n_skipped_img}")
     else:
-        print(f"  裁剪文字行: {n_crops}  跳过的图(缺box/读取失败): {n_skipped_img}")
+        print(f"  Cropping text lines: {n_crops}  Skipped images(missing boxes/failed to load): {n_skipped_img}")
     return n_crops
 
 
 def main():
     print("=" * 60)
-    print("SROIE -> CRNN 数据格式转换 (裁剪文字行 + 标签)")
+    print("SROIE -> CRNN Data Format Conversion (Text Line Cropping + Labels)")
     print("=" * 60)
 
     charset = set()
@@ -144,20 +131,19 @@ def main():
         charset,
     )
 
-    # 生成字符表：固定顺序(排序)，第0位留给CTC的blank符号
     os.makedirs(config.CRNN_DATA_ROOT, exist_ok=True)
     alphabet = sorted(charset)
     with open(config.CRNN_ALPHABET_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(alphabet))
 
     if n_train == 0:
-        print("\n⚠️  警告: 没有转换出任何训练样本，请检查 config.py 里的路径是否正确:")
+        print("\nWarning: No training samples were generated. Please check if the paths in config.py are correct.:")
         print(f"   TRAIN_IMG_DIR = {config.TRAIN_IMG_DIR}")
         print(f"   TRAIN_BOX_DIR = {config.TRAIN_BOX_DIR}")
     else:
-        print(f"\n✅ 训练集 {n_train} 条, 测试集 {n_test} 条")
-        print(f"✅ 字符表大小: {len(alphabet)} (含: {''.join(alphabet[:50])}{'...' if len(alphabet) > 50 else ''})")
-        print(f"✅ 已保存到 {config.CRNN_DATA_ROOT}")
+        print(f"\nTrain Set {n_train} , Test Set {n_test} ")
+        print(f"Character table size: {len(alphabet)} (Contain: {''.join(alphabet[:50])}{'...' if len(alphabet) > 50 else ''})")
+        print(f"Saved to {config.CRNN_DATA_ROOT}")
 
 
 if __name__ == "__main__":

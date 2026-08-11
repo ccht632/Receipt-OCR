@@ -1,13 +1,3 @@
-"""
-CRNN 训练用 Dataset。
-读取 prepare_crnn_data.py 生成的裁剪文字行图片 + labels.txt，
-统一resize/pad到固定宽度(config.CRNN_IMG_MAX_WIDTH)，转灰度单通道。
-文字标签用 alphabet 编码成 index 序列，给 CTCLoss 用。
-
-训练集额外做数据增强(轻微旋转/模糊/亮度对比度抖动/噪点)，模拟真实手机拍照的
-劣化情况(SROIE原图大多是较清晰的扫描/拍照，实际部署时收据可能模糊/歪斜/光照不均)，
-提升模型对训练集之外收据的泛化能力。验证集/测试集不做增强，保证评估结果稳定可比。
-"""
 import os
 import random
 
@@ -20,7 +10,6 @@ from crnn_utils import encode_text
 
 
 def load_labels(labels_file):
-    """读取 labels.txt (每行: 图片名\\t文字)，返回 [(crop_name, text), ...]"""
     items = []
     if not os.path.exists(labels_file):
         return items
@@ -37,11 +26,6 @@ def load_labels(labels_file):
 
 
 def resize_pad_width(gray_img: np.ndarray, target_height: int, max_width: int) -> np.ndarray:
-    """
-    输入已经是target_height高度的灰度图(crop_quad裁剪时已统一高度)。
-    宽度 <= max_width: 右侧补白(255)到max_width。
-    宽度 >  max_width: 直接resize压缩到max_width(极少数超长行,轻微形变可接受)。
-    """
     h, w = gray_img.shape[:2]
     if h != target_height:
         gray_img = cv2.resize(gray_img, (int(w * target_height / h), target_height))
@@ -56,11 +40,6 @@ def resize_pad_width(gray_img: np.ndarray, target_height: int, max_width: int) -
 
 
 def augment_line_image(img: np.ndarray) -> np.ndarray:
-    """
-    轻微数据增强，模拟手机拍照的常见劣化：
-    小角度旋转(歪斜) / 高斯模糊(失焦) / 亮度对比度抖动(光照不均) / 轻微噪点。
-    每种增强按概率随机触发，不是每张图都做全部，保持多样性。
-    """
     h, w = img.shape[:2]
 
     if random.random() < 0.3:
@@ -73,8 +52,8 @@ def augment_line_image(img: np.ndarray) -> np.ndarray:
         img = cv2.GaussianBlur(img, (k, k), 0)
 
     if random.random() < 0.3:
-        alpha = random.uniform(0.7, 1.3)  # 对比度
-        beta = random.uniform(-30, 30)    # 亮度
+        alpha = random.uniform(0.7, 1.3)
+        beta = random.uniform(-30, 30)
         img = np.clip(img.astype(np.float32) * alpha + beta, 0, 255).astype(np.uint8)
 
     if random.random() < 0.2:
@@ -92,7 +71,7 @@ class CRNNDataset(Dataset):
         self.char_to_idx = char_to_idx
         self.img_height = img_height
         self.max_width = max_width
-        self.augment = augment  # 只有训练集传True，验证/测试集保持原始图片
+        self.augment = augment
 
     def __len__(self):
         return len(self.items)
@@ -108,19 +87,14 @@ class CRNNDataset(Dataset):
 
         img = resize_pad_width(img, self.img_height, self.max_width)
         img = img.astype(np.float32) / 255.0
-        img = (img - 0.5) / 0.5  # 归一化到[-1,1]
-        img_tensor = torch.from_numpy(img).unsqueeze(0)  # (1, H, W)
+        img = (img - 0.5) / 0.5  
+        img_tensor = torch.from_numpy(img).unsqueeze(0)  
 
         target = encode_text(text, self.char_to_idx)
         return img_tensor, torch.LongTensor(target), text
 
 
 def crnn_collate_fn(batch):
-    """
-    batch: [(img_tensor, target_tensor, text_str), ...]
-    图片宽度已经在Dataset里统一pad到max_width了，可以直接stack。
-    target长度不一致，拼成一维长向量 + 每条的长度列表 (CTCLoss要求的格式)。
-    """
     images = torch.stack([b[0] for b in batch], dim=0)
     targets = torch.cat([b[1] for b in batch])
     target_lengths = torch.LongTensor([len(b[1]) for b in batch])

@@ -1,8 +1,3 @@
-"""
-DBNet 训练脚本。
-从 ImageNet 预训练权重开始 fine-tune，每个epoch记录 train loss 和 val loss，
-val loss 更低时保存 best checkpoint 到 config.DBNET_FINETUNED。
-"""
 import os
 import sys
 import time
@@ -24,7 +19,6 @@ def get_device():
 
 
 def run_epoch(model, loader, loss_fn, device, optimizer=None):
-    """optimizer给了就是训练模式(会更新参数), 不给就是验证模式(只算loss不更新)。"""
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
 
@@ -60,7 +54,7 @@ def run_epoch(model, loader, loss_fn, device, optimizer=None):
 
 def main():
     device = get_device()
-    print(f"使用设备: {device}")
+    print(f"Use equipment: {device}")
     os.makedirs(config.MODELS_DIR, exist_ok=True)
     os.makedirs(config.RUNS_DIR, exist_ok=True)
 
@@ -69,7 +63,7 @@ def main():
     print(f"train: {len(train_names)}张  val: {len(val_names)}张")
 
     if len(train_names) == 0:
-        print("⚠️ 没有训练数据，请先跑 prepare_dbnet_data.py")
+        print("Don't have training data, please run prepare_dbnet_data.py first.")
         return
 
     train_ds = DBNetDataset(config.DBNET_TRAIN_IMG_DIR, config.DBNET_TRAIN_GT_DIR,
@@ -119,12 +113,12 @@ def main():
         if len(val_ds) > 0 and val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), config.DBNET_FINETUNED)
-            print(f"  ✅ val_loss改善，保存best模型到 {config.DBNET_FINETUNED}")
+            print(f"  Improved val_loss, saving the best model to {config.DBNET_FINETUNED}")
         elif len(val_ds) == 0:
             torch.save(model.state_dict(), config.DBNET_FINETUNED)
 
-    print(f"\n训练完成。最佳 val_loss = {best_val_loss:.4f}")
-    print(f"训练日志: {log_path}")
+    print(f"\nTraining complete. Optimal val_loss = {best_val_loss:.4f}")
+    print(f"Training log: {log_path}")
 
 
 if __name__ == "__main__":

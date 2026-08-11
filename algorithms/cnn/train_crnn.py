@@ -1,9 +1,3 @@
-"""
-CRNN 训练脚本，从零训练(作业要求)。
-监控 val CER(字符错误率)：
-  - CER改善 -> 保存best权重
-  - 连续 config.CRNN_EARLY_STOP_PATIENCE 个epoch都没改善 -> 提前停止，防止过拟合
-"""
 import os
 import sys
 import time
@@ -20,7 +14,6 @@ from crnn_dataset import CRNNDataset, crnn_collate_fn
 
 
 class EarlyStopping:
-    """监控某个指标(越小越好，比如CER)，连续patience轮没有改善就触发停止。"""
 
     def __init__(self, patience=10, min_delta=1e-4):
         self.patience = patience
@@ -33,7 +26,7 @@ class EarlyStopping:
         if score < self.best_score - self.min_delta:
             self.best_score = score
             self.counter = 0
-            return True  # 表示这一轮是新的最优
+            return True  
         else:
             self.counter += 1
             if self.counter >= self.patience:
@@ -57,7 +50,7 @@ def run_train_epoch(model, loader, ctc_loss, optimizer, device):
         input_lengths = torch.full((images.size(0),), out.size(0), dtype=torch.long).to(device)
         loss = ctc_loss(out, targets, input_lengths, target_lengths)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)  # CTC训练容易梯度爆炸,裁剪一下
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0) 
         optimizer.step()
 
         total_loss += loss.item()
@@ -67,7 +60,6 @@ def run_train_epoch(model, loader, ctc_loss, optimizer, device):
 
 @torch.no_grad()
 def run_val_epoch(model, loader, ctc_loss, device, idx_to_char):
-    """返回 (val_loss, val_cer)"""
     model.eval()
     total_loss = 0.0
     total_cer = 0.0
@@ -78,13 +70,13 @@ def run_val_epoch(model, loader, ctc_loss, device, idx_to_char):
         images_d = images.to(device)
         targets_d, target_lengths_d = targets.to(device), target_lengths.to(device)
 
-        out = model(images_d)  # (W', B, C)
+        out = model(images_d)  
         input_lengths = torch.full((images.size(0),), out.size(0), dtype=torch.long).to(device)
         loss = ctc_loss(out, targets_d, input_lengths, target_lengths_d)
         total_loss += loss.item()
         n_batches += 1
 
-        pred_indices = out.argmax(2).permute(1, 0).cpu().numpy()  # (B, W')
+        pred_indices = out.argmax(2).permute(1, 0).cpu().numpy()  
         for i, text in enumerate(texts):
             pred_text = ctc_greedy_decode(pred_indices[i], idx_to_char)
             total_cer += compute_cer(pred_text, text)
@@ -98,17 +90,17 @@ def run_val_epoch(model, loader, ctc_loss, device, idx_to_char):
 def main():
     device = get_device()
     if device.type == "cpu":
-        torch.set_num_threads(os.cpu_count())  # 用满所有CPU核心
-    print(f"使用设备: {device}")
+        torch.set_num_threads(os.cpu_count())  
+    print(f"Using Equipment: {device}")
     os.makedirs(config.MODELS_DIR, exist_ok=True)
     os.makedirs(config.RUNS_DIR, exist_ok=True)
 
     if not os.path.exists(config.CRNN_ALPHABET_FILE):
-        print("⚠️ 找不到 alphabet.txt，请先跑 prepare_crnn_data.py")
+        print("alphabet.txt is not found, please run prepare_crnn_data.py.")
         return
     char_to_idx, idx_to_char = load_alphabet(config.CRNN_ALPHABET_FILE)
     num_classes = len(char_to_idx)
-    print(f"字符表大小: {num_classes}")
+    print(f"Character table size: {num_classes}")
 
     train_ds = CRNNDataset(config.CRNN_TRAIN_CROPS_DIR, config.CRNN_TRAIN_LABELS, char_to_idx,
                             img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH,
@@ -116,10 +108,10 @@ def main():
     val_ds = CRNNDataset(config.CRNN_TRAIN_CROPS_DIR, config.CRNN_VAL_LABELS, char_to_idx,
                           img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH,
                           augment=False)
-    print(f"train: {len(train_ds)}条  val: {len(val_ds)}条")
+    print(f"train: {len(train_ds)}  val: {len(val_ds)}")
 
     if len(train_ds) == 0:
-        print("⚠️ 没有训练数据")
+        print("No training data")
         return
 
     train_loader = DataLoader(train_ds, batch_size=config.CRNN_BATCH_SIZE, shuffle=True,
@@ -169,11 +161,11 @@ def main():
                     "img_height": config.CRNN_IMG_HEIGHT,
                     "hidden_size": config.CRNN_HIDDEN_SIZE,
                 }, config.CRNN_WEIGHTS)
-                print(f"  ✅ val_CER改善至{val_cer:.4f}，保存best模型到 {config.CRNN_WEIGHTS}")
+                print(f"  val_CER has been improved to {val_cer:.4f}，best model has been saved to {config.CRNN_WEIGHTS}")
 
             if early_stopping.should_stop:
-                print(f"\n🛑 Early stopping：val_CER连续{config.CRNN_EARLY_STOP_PATIENCE}轮没有改善，"
-                      f"在第{epoch}轮停止训练，防止过拟合。最佳val_CER={early_stopping.best_score:.4f}")
+                print(f"\nEarly stopping：val_CER has no improvement after 10 consecutive rounds of {config.CRNN_EARLY_STOP_PATIENCE}，"
+                      f"Training is stopped at {epoch}，to prevent overfitting. Optimal val_CER={early_stopping.best_score:.4f}")
                 break
         else:
             torch.save({
@@ -184,7 +176,7 @@ def main():
                 "hidden_size": config.CRNN_HIDDEN_SIZE,
             }, config.CRNN_WEIGHTS)
 
-    print(f"\n训练结束。日志: {log_path}")
+    print(f"\nTraining Complete.Log: {log_path}")
 
 
 if __name__ == "__main__":

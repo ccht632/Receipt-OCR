@@ -38,12 +38,9 @@ MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
               "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 MONTH_FULL = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
               "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"]
-# Compare the edit distance of the fully recognized word (without truncation) with both the "abbreviation" and the "full month name".
-# Take the closest one globally -- this also helps with disambiguation due to length information (e.g., "JALY" is closer to JULY than JAN).
+
 _MONTH_CANDIDATES = [(abbr, abbr) for abbr in MONTH_ABBR] + [(full, abbr) for full, abbr in zip(MONTH_FULL, MONTH_ABBR)]
 
-# Backup: Any structure of "numbers, three to nine alphanumeric characters", with the alphanumeric part using edit distance for fuzzy matching of the month.
-# (Tolerates one character recognition error, such as AUG often being recognized as AUO/AWG on thermal receipts)
 FUZZY_DATE_RE = re.compile(r"\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})\b")
 
 
@@ -61,7 +58,6 @@ def _fuzzy_match_month(word: str):
             best_abbr, best_dist = abbr, d
     return best_abbr if best_dist <= 1 else None
 
-# Common keywords/state names for receipt addresses in Malaysia
 ADDRESS_KEYWORDS = [
     "JALAN", "JLN", "LORONG", "PERSIARAN", "TAMAN", "BANDAR", "KAMPUNG", "KG ",
     "LEVEL", "TINGKAT", "LOT ", "NO.", "NO ", "BLOCK", "BLOK", "UNIT",
@@ -71,13 +67,12 @@ ADDRESS_KEYWORDS = [
 ]
 POSTCODE_RE = re.compile(r"\b\d{5}\b")
 
-# Lines that are clearly not addresses/company names should be skipped during address scanning without interrupting the scan.
 NOISE_LINE_RE = re.compile(
     r"(GST\s*ID|TEL\s*NO|PHONE|FAX|LICENSEE|WEBSITE|EMAIL|REG\s*NO)", re.IGNORECASE
 )
-# Company registration number, such as "(65351-M)", is easily misinterpreted as a postal code due to its purely numerical format; therefore, it should be excluded.
+
 REG_NUMBER_RE = re.compile(r"^\(?\d{4,}[-–][A-Z]\)?$")
-# When you encounter these numbers, it means you've entered the product details area; address scanning should stop.
+
 STOP_ADDRESS_SCAN_RE = re.compile(
     r"(TAX INVOICE|^INVOICE|QTY|ITEM|RECEIPT NO|ORD\s*#|TABLE)", re.IGNORECASE
 )
@@ -94,10 +89,6 @@ def _box_bounds(box):
 
 
 def _normalize_lines(lines):
-    """
-    Unify format into [(text, box_or_None, y_center), ...]
-    and sort entries from top to bottom by y_center.
-    """
     normalized = []
     for i, item in enumerate(lines):
         if isinstance(item, (tuple, list)) and len(item) == 2:
@@ -111,17 +102,14 @@ def _normalize_lines(lines):
             _, ymin, _, ymax = _box_bounds(box)
             y_center = (ymin + ymax) / 2
         else:
-            y_center = i  # If no coordinates are available, use the original order as the "height".
+            y_center = i  
         normalized.append((text, box, y_center))
     normalized.sort(key=lambda x: x[2])
     return normalized
 
 
 def extract_company(norm_lines):
-    """
-    Company Name: The first line that "appears to be a name" when scanning top-to-bottom
-    (contains letters, length ≥ 3, and is not a pure noise line).
-    """
+
     skip_words = ("TAX INVOICE", "RECEIPT", "INVOICE", "SIMPLIFIED")
     for text, _, _ in norm_lines:
         letters = sum(c.isalpha() for c in text)
@@ -136,12 +124,7 @@ def extract_company(norm_lines):
 
 
 def extract_address(norm_lines, company_text, max_scan=10):
-    """
-    Address: Scan within the first `max_scan` lines following the company name.
-    Select lines matching address keywords or postal code patterns,
-    and concatenate them in order.
-    Stop scanning once a line marking the start of item details is encountered.
-    """
+
     parts = []
     started = False
     scanned = 0
@@ -164,8 +147,8 @@ def extract_address(norm_lines, company_text, max_scan=10):
         is_address_line = (
             POSTCODE_RE.search(text)
             or any(kw in upper for kw in ADDRESS_KEYWORDS)
-            or text.count(",") >= 2  # Malaysian addresses commonly use a comma-separated format: "street, district, city".
-                                       # A fallback situation where OCR misidentifies place names (e.g., KUALA->KUALE), causing keyword matching failures.
+            or text.count(",") >= 2  
+                                       
         )
         if is_address_line:
             parts.append(text)
@@ -180,7 +163,7 @@ def extract_date(norm_lines):
             if m:
                 return m.group(1)
 
-    # No match found in strict mode -> Use fuzzy month matching as a fallback (tolerates OCR misinterpreting the month abbreviation by one character).
+    
     for text, _, _ in norm_lines:
         m = FUZZY_DATE_RE.search(text)
         if m:
@@ -192,23 +175,19 @@ def extract_date(norm_lines):
 
 
 def extract_total(norm_lines):
-    """
-    找含独立单词TOTAL的行(排除SUBTOTAL)。
-    金额优先在同一行找；同一行没有就找"同一水平行(box)在右边的相邻行"；
-    没有box信息就退化成"紧接着的下一行"(适配label在上、金额在下堆叠的排版)。
-    """
+ 
     for idx, (text, box, _) in enumerate(norm_lines):
         if not TOTAL_KEYWORD_RE.search(text):
             continue
         if TOTAL_EXCLUDE_RE.search(text):
             continue
 
-        # Scenario 1: The amount is within this bank's balance (e.g., "TOTAL RM12.80")
+        
         m = MONEY_RE.search(text)
         if m:
             return m.group(0)
 
-        # Scenario 2: Use the box position to find the amount "on the right side of the same row".
+        
         if box is not None:
             label_bounds = _box_bounds(box)
             best = None
@@ -230,7 +209,7 @@ def extract_total(norm_lines):
                 if m2:
                     return m2.group(0)
 
-        # Case 3: Degenerates into "the next line immediately following" (pure amount format)
+        
         if idx + 1 < len(norm_lines):
             next_text = norm_lines[idx + 1][0].strip()
             if PURE_MONEY_RE.match(next_text):
@@ -242,10 +221,6 @@ def extract_total(norm_lines):
 
 
 def parse_receipt(lines):
-    """
-    lines: List[Tuple[str, box]] or List[str]
-    Return: {"company": str, "address": str, "date": str, "total": str}
-    """
     norm_lines = _normalize_lines(lines)
 
     company = extract_company(norm_lines)

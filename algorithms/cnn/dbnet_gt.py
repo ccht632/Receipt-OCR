@@ -1,8 +1,3 @@
-"""
-DBNet 训练标签生成: 把多边形标注转成 shrink_map(概率图GT) 和 threshold_map(阈值图GT)。
-标准做法参考DB论文: 用pyclipper把polygon向内缩(shrink)得到概率图正样本区域,
-向外扩(expand)得到阈值图的过渡带区域,过渡带内每个像素到原polygon边界的距离归一化后作为阈值标签。
-"""
 import numpy as np
 import cv2
 import pyclipper
@@ -10,7 +5,6 @@ from shapely.geometry import Polygon
 
 
 def shrink_polygon(polygon: np.ndarray, ratio: float):
-    """polygon向内缩小,返回缩小后的多边形点(可能为空,极小多边形缩没了)。"""
     poly_shape = Polygon(polygon)
     if poly_shape.area <= 0 or poly_shape.length <= 0:
         return None
@@ -37,7 +31,6 @@ def expand_polygon(polygon: np.ndarray, ratio: float):
 
 
 def make_shrink_map(polygons, h, w, shrink_ratio=0.4, min_text_size=8):
-    """返回 (prob_gt, prob_mask): 概率图标签 + 有效区域mask(过小/退化的框不参与loss)。"""
     prob_gt = np.zeros((h, w), dtype=np.float32)
     prob_mask = np.ones((h, w), dtype=np.float32)
 
@@ -45,7 +38,6 @@ def make_shrink_map(polygons, h, w, shrink_ratio=0.4, min_text_size=8):
         height = max(polygon[:, 1]) - min(polygon[:, 1])
         width = max(polygon[:, 0]) - min(polygon[:, 0])
         if height < min_text_size or width < min_text_size:
-            # 太小的框：该区域不参与loss计算(既不算正样本也不算负样本)
             cv2.fillPoly(prob_mask, [polygon.astype(np.int32)], 0)
             continue
 
@@ -112,7 +104,6 @@ def _draw_border_map(polygon, canvas, mask, shrink_ratio=0.4):
 
 
 def make_threshold_map(polygons, h, w, shrink_ratio=0.4, thresh_min=0.3, thresh_max=0.7):
-    """返回 (thresh_gt, thresh_mask): 阈值图标签(过渡带区域内插值) + 该区域mask。"""
     canvas = np.zeros((h, w), dtype=np.float32)
     mask = np.zeros((h, w), dtype=np.float32)
     for polygon in polygons:

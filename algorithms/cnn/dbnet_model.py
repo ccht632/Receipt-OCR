@@ -1,8 +1,3 @@
-"""
-DBNet 模型结构: ResNet backbone(ImageNet预训练) + FPN neck + DB head
-输出三张图: prob_map(文字概率图), thresh_map(阈值图), binary_map(可微二值化图)
-推理时只需要 prob_map 去做后处理提取文字框。
-"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,7 +5,6 @@ import torchvision.models as models
 
 
 class ResNetBackbone(nn.Module):
-    """提取4个stage的特征图，stride分别是4/8/16/32。"""
 
     def __init__(self, backbone="resnet18", pretrained=True):
         super().__init__()
@@ -21,13 +15,13 @@ class ResNetBackbone(nn.Module):
             net = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None)
             self.out_channels = [256, 512, 1024, 2048]
         else:
-            raise ValueError(f"不支持的backbone: {backbone}")
+            raise ValueError(f"Unsupported backbone: {backbone}")
 
         self.stem = nn.Sequential(net.conv1, net.bn1, net.relu, net.maxpool)
-        self.layer1 = net.layer1  # stride 4
-        self.layer2 = net.layer2  # stride 8
-        self.layer3 = net.layer3  # stride 16
-        self.layer4 = net.layer4  # stride 32
+        self.layer1 = net.layer1 
+        self.layer2 = net.layer2
+        self.layer3 = net.layer3
+        self.layer4 = net.layer4
 
     def forward(self, x):
         x = self.stem(x)
@@ -39,7 +33,6 @@ class ResNetBackbone(nn.Module):
 
 
 class FPN(nn.Module):
-    """标准FPN: 1x1降通道 -> 上采样相加 -> 3x3平滑 -> 全部上采样到1/4分辨率拼接。"""
 
     def __init__(self, in_channels_list, out_channels=256):
         super().__init__()
@@ -63,12 +56,11 @@ class FPN(nn.Module):
         f3 = F.interpolate(self.smooth[1](p3), size=target_size, mode="nearest")
         f2 = self.smooth[0](p2)
 
-        fused = torch.cat([f2, f3, f4, f5], dim=1)  # 通道数 = out_channels (4 * out_channels//4)
+        fused = torch.cat([f2, f3, f4, f5], dim=1) 
         return fused
 
 
 class DBHead(nn.Module):
-    """概率图分支 + 阈值图分支，各自两次上采样恢复到原图1/1分辨率(相对stride4的特征图再上采样4倍)。"""
 
     def __init__(self, in_channels=256, k=50):
         super().__init__()
