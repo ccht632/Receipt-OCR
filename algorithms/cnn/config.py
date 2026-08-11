@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 # ============================================================
 # 原始 SROIE 数据集路径
 # ============================================================
-DATA_ROOT = os.path.join(PROJECT_ROOT, "data", "SROIE")
+DATA_ROOT = os.path.join(PROJECT_ROOT, "data", "SROIE2019")
 
 TRAIN_IMG_DIR = os.path.join(DATA_ROOT, "train", "img")
 TRAIN_BOX_DIR = os.path.join(DATA_ROOT, "train", "box")
