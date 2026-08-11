@@ -97,6 +97,8 @@ def run_val_epoch(model, loader, ctc_loss, device, idx_to_char):
 
 def main():
     device = get_device()
+    if device.type == "cpu":
+        torch.set_num_threads(os.cpu_count())  # 用满所有CPU核心
     print(f"使用设备: {device}")
     os.makedirs(config.MODELS_DIR, exist_ok=True)
     os.makedirs(config.RUNS_DIR, exist_ok=True)
@@ -109,9 +111,11 @@ def main():
     print(f"字符表大小: {num_classes}")
 
     train_ds = CRNNDataset(config.CRNN_TRAIN_CROPS_DIR, config.CRNN_TRAIN_LABELS, char_to_idx,
-                            img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH)
+                            img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH,
+                            augment=True)
     val_ds = CRNNDataset(config.CRNN_TRAIN_CROPS_DIR, config.CRNN_VAL_LABELS, char_to_idx,
-                          img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH)
+                          img_height=config.CRNN_IMG_HEIGHT, max_width=config.CRNN_IMG_MAX_WIDTH,
+                          augment=False)
     print(f"train: {len(train_ds)}条  val: {len(val_ds)}条")
 
     if len(train_ds) == 0:

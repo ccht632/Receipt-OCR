@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 # ============================================================
 # 原始 SROIE 数据集路径
 # ============================================================
-DATA_ROOT = os.path.join(PROJECT_ROOT, "data", "SROIE2019")
+DATA_ROOT = os.path.join(PROJECT_ROOT, "data", "SROIE")
 
 TRAIN_IMG_DIR = os.path.join(DATA_ROOT, "train", "img")
 TRAIN_BOX_DIR = os.path.join(DATA_ROOT, "train", "box")
@@ -78,8 +78,8 @@ DBNET_EARLY_STOP_PATIENCE = 10  # val_loss连续10轮不改善就提前停止
 # CRNN 超参数
 # ============================================================
 CRNN_IMG_HEIGHT = 32            # 输入图片统一高度(经典CRNN设定)
-CRNN_IMG_MAX_WIDTH = 280        # 输入图片最大宽度(超过则resize)
-CRNN_HIDDEN_SIZE = 256          # BiLSTM隐藏层大小
+CRNN_IMG_MAX_WIDTH = 280         # 输入图片最大宽度(超过则resize) -- Colab有GPU了，改回280提升精度上限
+CRNN_HIDDEN_SIZE = 256           # BiLSTM隐藏层大小 -- Colab有GPU了，改回256提升精度上限
 CRNN_BATCH_SIZE = 32
 CRNN_EPOCHS = 100
 CRNN_LR = 1e-3

@@ -17,9 +17,14 @@ import numpy as np
 MONEY_RE = re.compile(r"\d{1,3}(?:,\d{3})*\.\d{2}")
 PURE_MONEY_RE = re.compile(r"^(RM)?\s*\d{1,3}(?:,\d{3})*\.\d{2}$", re.IGNORECASE)
 
+MONTH_NAMES = (r"JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|"
+               r"JUL(?:Y)?|AUG(?:UST)?|SEP(?:T|TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?")
+
 DATE_PATTERNS = [
     re.compile(r"\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b"),   # 24/06/2018, 24-06-18
     re.compile(r"\b(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})\b"),     # 2018-06-24
+    re.compile(rf"\b(\d{{1,2}}\s+(?:{MONTH_NAMES})\s+\d{{2,4}})\b", re.IGNORECASE),  # 19 JULY 2026
+    re.compile(rf"\b((?:{MONTH_NAMES})\s+\d{{1,2}},?\s+\d{{2,4}})\b", re.IGNORECASE),  # JULY 19, 2026
 ]
 
 # 马来西亚收据地址常见关键词/州名
@@ -34,7 +39,7 @@ POSTCODE_RE = re.compile(r"\b\d{5}\b")
 
 # 明显不是地址/公司名的行，扫描地址时跳过但不打断扫描
 NOISE_LINE_RE = re.compile(
-    r"(GST\s*ID|TEL\s*NO|PHONE|FAX|LICENSEE|WEBSITE|EMAIL)", re.IGNORECASE
+    r"(GST\s*ID|TEL\s*NO|PHONE|FAX|LICENSEE|WEBSITE|EMAIL|REG\s*NO)", re.IGNORECASE
 )
 # 公司注册号，如 "(65351-M)"，纯数字容易被误判成邮编，单独排除
 REG_NUMBER_RE = re.compile(r"^\(?\d{4,}[-–][A-Z]\)?$")
@@ -114,7 +119,12 @@ def extract_address(norm_lines, company_text, max_scan=10):
             continue
 
         upper = text.upper()
-        is_address_line = POSTCODE_RE.search(text) or any(kw in upper for kw in ADDRESS_KEYWORDS)
+        is_address_line = (
+            POSTCODE_RE.search(text)
+            or any(kw in upper for kw in ADDRESS_KEYWORDS)
+            or text.count(",") >= 2  # 马来西亚地址常见"街道,区,城市"逗号分隔格式，
+                                       # 兜底OCR把地名认错(如KUALA->KUALE)导致关键词匹配不上的情况
+        )
         if is_address_line:
             parts.append(text)
 
