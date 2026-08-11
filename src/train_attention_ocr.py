@@ -22,6 +22,8 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
 import cv2
 import numpy as np
+import time
+from tqdm import tqdm
 
 # ---------------- 配置区 ----------------
 DATA_ROOT = "data/SROIE2019/train"
@@ -268,10 +270,17 @@ def train():
     best_val_loss = float("inf")
     patience_counter = 0
 
+    training_start_time = time.time()
+
     for epoch in range(EPOCHS):
         model.train()
         total_train_loss = 0
-        for images, labels in train_loader:
+        epoch_start_time = time.time()
+
+        # 新增：进度条，实时显示当前epoch跑到第几个batch、当前loss、速度
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}", unit="batch")
+
+        for images, labels in progress_bar:
             images, labels = images.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -289,12 +298,19 @@ def train():
             optimizer.step()
             total_train_loss += loss.item()
 
+            # 新增：进度条右侧实时显示当前batch的loss
+            progress_bar.set_postfix(loss=f"{loss.item():.4f}")
+
         avg_train_loss = total_train_loss / len(train_loader)
         avg_val_loss = evaluate(model, val_loader, criterion, device)
 
         current_lr = optimizer.param_groups[0]['lr']
+        epoch_time = time.time() - epoch_start_time
+        total_elapsed = time.time() - training_start_time
+
         print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {avg_train_loss:.4f} - "
-              f"Val Loss: {avg_val_loss:.4f} - LR: {current_lr:.6f}")
+              f"Val Loss: {avg_val_loss:.4f} - LR: {current_lr:.6f} - "
+              f"Epoch time: {epoch_time/60:.1f}min - Total elapsed: {total_elapsed/60:.1f}min")
 
         scheduler.step(avg_val_loss)
 
