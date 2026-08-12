@@ -42,6 +42,8 @@ DROPOUT = 0.3                  # 新增：Dropout比例
 VAL_SPLIT = 0.15               # 新增：15%数据作为验证集
 EARLY_STOP_PATIENCE = 5        # 新增：验证集连续5轮没进步就停止
 MODEL_SAVE_PATH = "models/ocr/attention_ocr_model.pth"
+# 新增：自动备份到Google Drive的路径。如果不在Colab环境跑，设成 None 就不会备份
+DRIVE_BACKUP_PATH = "/content/drive/MyDrive/ReceiptOCR-data/models/attention_ocr_model.pth"
 # -----------------------------------------
 
 CHARSET = string.digits + string.ascii_uppercase + string.ascii_lowercase + " .,:-/()&%$"
@@ -257,6 +259,15 @@ def train():
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     model = AttentionOCR(VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, DROPOUT).to(device)
+
+    # 新增：断点续训 —— 如果已经有之前保存的模型，从这个基础上继续训练
+    start_epoch = 0
+    best_val_loss = float("inf")
+    if os.path.exists(MODEL_SAVE_PATH):
+        print(f"Found existing model at {MODEL_SAVE_PATH}, resuming training...")
+        model.load_state_dict(torch.load(MODEL_SAVE_PATH, map_location=device))
+        print("Loaded previous weights successfully.")
+
     criterion = nn.CrossEntropyLoss(ignore_index=PAD)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
@@ -267,7 +278,6 @@ def train():
 
     os.makedirs(os.path.dirname(MODEL_SAVE_PATH), exist_ok=True)
 
-    best_val_loss = float("inf")
     patience_counter = 0
 
     training_start_time = time.time()
@@ -320,6 +330,15 @@ def train():
             patience_counter = 0
             torch.save(model.state_dict(), MODEL_SAVE_PATH)
             print(f"  -> Validation loss improved. Model saved.")
+
+            # 新增：自动同步备份到Google Drive，防止Colab session断开导致丢失
+            if DRIVE_BACKUP_PATH:
+                try:
+                    os.makedirs(os.path.dirname(DRIVE_BACKUP_PATH), exist_ok=True)
+                    torch.save(model.state_dict(), DRIVE_BACKUP_PATH)
+                    print(f"  -> Backed up to Google Drive.")
+                except Exception as e:
+                    print(f"  -> WARNING: Drive backup failed ({e}). Model only saved locally.")
         else:
             patience_counter += 1
             print(f"  -> No improvement. Patience: {patience_counter}/{EARLY_STOP_PATIENCE}")
